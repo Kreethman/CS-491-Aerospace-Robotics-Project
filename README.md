@@ -47,7 +47,7 @@ roslaunch robowork_minihawk_gazebo minihawk_playpen.launch
 This is a really common autopilot software and uses Mavlink to communicate with Gazebo
 
 ```
-cd $HOME/aerial_robotics_ws/ardupilot
+cd /app/aerial_robotics_ws/ardupilot
 ./Tools/autotest/sim_vehicle.py -v ArduPlane -f gazebo-minihawk --model gazebo-quadplane-tilttri --console  # --map
 wp load ../src/aerial_robotics/robowork_minihawk_gazebo/resources/waypoints.txt
 ```
@@ -57,7 +57,7 @@ wp load ../src/aerial_robotics/robowork_minihawk_gazebo/resources/waypoints.txt
 This isn't actually necessary but good to have so you can see what the drone is viewing on the USB camera and local physics simulation
 
 ```
-rviz -d $HOME/aerial_robotics_ws/src/aerial_robotics/robowork_minihawk_launch/config/minihawk_SIM.rviz
+rviz -d /app/aerial_robotics_ws/src/aerial_robotics/robowork_minihawk_launch/config/minihawk_SIM.rviz
 ```
 
 ### MAVROS
@@ -68,7 +68,7 @@ This is where the actual ROS connectivity comes into play; this will create topi
 ROS_NAMESPACE="minihawk_SIM" roslaunch robowork_minihawk_launch vehicle1_apm_SIM.launch
 ```
 
-## You!
+## Packages
 
 ### Creating your package
 
@@ -78,5 +78,5 @@ Okay, so now we're in our ```/src``` directory on the docker terminal. Run ```ca
 
 Once we have a node working and we've recompiled via ```catkin build```, we can run our new node via
 ```
-rosrun my_package node.py
+rosrun my_package test_node.py
 ```
