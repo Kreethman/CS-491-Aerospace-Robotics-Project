@@ -11,14 +11,14 @@ from apriltag_ros.msg import *
 # What height to set for takeoff
 TAKEOFF_HEIGHT = 10
 # Time to wait for drone to reach altitude
-CLIMB_TIME = 5
+CLIMB_TIME = 10
 # Decide on how many subsequent detections there must be in order for this to work
 SEARCH_MODE_STREAK = 5
 # Parameters for movement
-GAIN_PITCH = 60
-GAIN_ROLL = 60
-GAIN_YAW = 100 # This needs to be relatively large to have any discernable impact
-GAIN_THROTTLE = 10
+GAIN_PITCH = 150
+GAIN_ROLL = 150
+GAIN_YAW = 300 # This needs to be relatively large to have any discernable impact
+GAIN_THROTTLE = 200 # Basically just take max throttle
 
 MAX_PITCH = 100
 MAX_ROLL = 100
@@ -26,6 +26,15 @@ MAX_YAW = 100
 MAX_THROTTLE = 100
 # Z offset for when to transition into landing mode
 LAND_HEIGHT = 10
+X_OFF = 0
+Y_OFF = .75
+
+yaw_error = 0
+roll_error = 0
+pitch_error = 0
+z_error = 0
+
+ATTENUATION_RATE = .9
 
 
 class State(Enum):
@@ -91,7 +100,7 @@ class FlightPlan:
 
             elif self.state == State.CLIMBING:
                 elapsed = (rospy.Time.now() - self.takeoff_start_time).to_sec()
-                if elapsed > 10:
+                if elapsed > CLIMB_TIME:
                     self.set_mode(custom_mode="AUTO")
                     self.arm(True)
                     self.state = State.SEARCH
@@ -109,31 +118,52 @@ class FlightPlan:
                 pitch_input = 1500
                 z_input = 1500
 
-                yaw_error = 0
-                roll_error = 0
-                pitch_error = 0
-                z_error = 0
+                #yaw_error = 0
+                #roll_error = 0
+                #pitch_error = 0
+                #z_error = 0
                 # If there is a marker to compute and find errors:
                 if self.april_pose:
                     p = self.april_pose.position
                     q = self.april_pose.orientation
                     # YAW
-                    yaw_error = -quaternion_to_yaw(q.x,q.y,q.z,q.w)
-                    if abs(yaw_error) < .3:
+                    yaw_error = quaternion_to_yaw(q.x,q.y,q.z,q.w)
+                    #print(yaw_error)
+                    if abs(yaw_error) < .1:
                         yaw_error = 0
                     # ROLL
-                    roll_error = p.x
+                    roll_error = p.x - X_OFF
                     if abs(roll_error) < .3:
                         roll_error = 0
                     # PITCH
-                    pitch_error = -p.y
-                    if abs(pitch_error) < .1:
+                    pitch_error = -p.y - Y_OFF
+                    if abs(pitch_error) < .3:
                         pitch_error = 0
                     # HEIGHT
                     z_error = LAND_HEIGHT - p.z
                     if abs(z_error) < 1:
                         z_error = 0
-                    print(p,yaw_error)
+                    print(p)
+                    print(roll_error, pitch_error, z_error,yaw_error)
+
+                    # if in correct position OR lost track of the marker then land
+                    if (self.april_pose and abs(roll_error) < .3 and abs(pitch_error) < .3 and abs(z_error) < 1 and abs(yaw_error) < .2): #or self.april_streak == 0:
+                        self.set_mode(custom_mode="QLAND")
+                        self.state = State.LAND
+                        print("LANDING!",z_error)
+                else:
+                    yaw_error *= ATTENUATION_RATE
+                    if yaw_error < .15:
+                        yaw_error = 0
+                    roll_error *= ATTENUATION_RATE 
+                    if roll_error < .1:
+                        roll_error = 0
+                    pitch_error *= ATTENUATION_RATE
+                    if pitch_error < .1:
+                        pitch_error /= 2
+                    z_error *= ATTENUATION_RATE
+                    if z_error < 1:
+                        z_error = 0
                 
                 yaw_input = yaw_error * GAIN_YAW
                 roll_input = roll_error * GAIN_ROLL 
@@ -174,13 +204,8 @@ class FlightPlan:
                 msg.channels[5] = 1000
                 msg.channels[6] = 1000
                 msg.channels[7] = 1800
-                print(msg.channels[0:4])
+                #print(msg.channels[0:4])
                 self.rc_pub.publish(msg)
-                # if in correct position OR lost track of the marker then land
-                if (self.april_pose and abs(roll_error) < .5 and abs(pitch_error) < .5 and abs(z_error) < 5 and abs(yaw_error) < .2) or self.april_streak == 0:
-                    self.set_mode(custom_mode="QLAND")
-                    self.state = State.LAND
-                    print("LANDING!")
 
             self.rate.sleep()
 if __name__ == '__main__':
